@@ -1,6 +1,6 @@
-# eMart.Service.Api
+# eMart
 
-eMart.Service.Api is a RESTful API built with ASP.NET Core (.NET 8) for managing users, products, categories, and favorites in an e-commerce platform. It uses JWT authentication, Entity Framework Core with MySQL, and provides endpoints for user and product management, including favorite functionality.
+eMart is a RESTful API built with ASP.NET Core (.NET 8) for managing users, products, categories, and favorites in an e-commerce platform. It uses JWT authentication, Entity Framework Core with MySQL, and provides endpoints for user and product management, including favorite functionality.
 
 ## Features
 
