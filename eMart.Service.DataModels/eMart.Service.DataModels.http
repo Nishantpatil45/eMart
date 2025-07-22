@@ -1,0 +1,6 @@
+@eMart.Service.DataModels_HostAddress = http://localhost:5048
+
+GET {{eMart.Service.DataModels_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
