@@ -13,5 +13,6 @@ namespace eMart.Service.Core.Dtos.Common
         public const int Unauthorized = 401;
         public const int NotFound = 404;
         public const int InternalServerError = 500;
+        public const int Conflict = 409; // Added Conflict status code
     }
 }

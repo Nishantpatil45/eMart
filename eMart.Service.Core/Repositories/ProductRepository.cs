@@ -22,6 +22,11 @@ namespace eMart.Service.Core.Repositories
         {
             try
             {
+                if (productCreateRequestDto == null || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+                {
+                    Console.WriteLine("Invalid product data or user.");
+                    return null;
+                }
                 var newProduct = new Product
                 {
                     Name = productCreateRequestDto.Name,
@@ -37,7 +42,6 @@ namespace eMart.Service.Core.Repositories
                     CreatedAt = DateTime.UtcNow,
                     IsDeleted = false
                 };
-                 
                 await dbContext.Products.AddAsync(newProduct);
                 await dbContext.SaveChangesAsync();
                 return new ProductCommonResponseDto
@@ -58,24 +62,27 @@ namespace eMart.Service.Core.Repositories
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error in CreateProduct: {ex.Message}");
                 return null;
             }
         }
 
         public async Task<ProductCommonResponseDto> DeleteProduct(string id, UserDto userDto)
         {
+            if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                Console.WriteLine("Invalid product id or user.");
+                return null;
+            }
             var existingPoduct = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
-
             if (existingPoduct == null)
             {
-                throw new Exception(CommonMessages.ProductNotFound);
+                Console.WriteLine("Product not found or already deleted.");
+                return null;
             }
-
             existingPoduct.IsDeleted = true;
             existingPoduct.DeletedBy = userDto.Id;
-
             await dbContext.SaveChangesAsync();
-
             return new ProductCommonResponseDto
             {
                 Id = existingPoduct.Id,
@@ -97,52 +104,51 @@ namespace eMart.Service.Core.Repositories
 
         public async Task<List<ProductCommonResponseDto>> GetProduct(UserDto userDto)
         {
+            if (userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                Console.WriteLine("Invalid user.");
+                return new List<ProductCommonResponseDto>();
+            }
             var favoriteProductIds = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).Select(f => f.ProductId).ToListAsync();
-
             var products = await dbContext.Products.Where(x => x.IsDeleted == false).ToListAsync();
-
-            if (products.Any())
+            return products.Select(product => new ProductCommonResponseDto
             {
-                return products.Select(product => new ProductCommonResponseDto
-                {
-                    Id = product.Id,
-                    Name = product.Name,
-                    Description = product.Description,
-                    Price = product.Price,
-                    CategoryId = product.CategoryId,
-                    Brand = product.Brand,
-                    Stock = product.Stock,
-                    ImageUrl = product.ImageUrl,
-                    SellerId = product.SellerId,
-                    Status = product.Status,
-                    Rating = product.Rating,
-                    NumReviews = product.NumReviews,
-                    CreatedAt = product.CreatedAt,
-                    CreatedBy = product.CreatedBy,
-                    UpdatedAt = product.UpdatedAt,
-                    UpdatedBy = product.UpdatedBy,
-                    IsDeleted = product.IsDeleted,
-                    DeletedBy = product.DeletedBy,
-                    IsFavorite = favoriteProductIds.Contains(product.Id)
-                }).ToList();
-            }
-            else
-            {
-                return null;
-            }
+                Id = product.Id,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                CategoryId = product.CategoryId,
+                Brand = product.Brand,
+                Stock = product.Stock,
+                ImageUrl = product.ImageUrl,
+                SellerId = product.SellerId,
+                Status = product.Status,
+                Rating = product.Rating,
+                NumReviews = product.NumReviews,
+                CreatedAt = product.CreatedAt,
+                CreatedBy = product.CreatedBy,
+                UpdatedAt = product.UpdatedAt,
+                UpdatedBy = product.UpdatedBy,
+                IsDeleted = product.IsDeleted,
+                DeletedBy = product.DeletedBy,
+                IsFavorite = favoriteProductIds.Contains(product.Id)
+            }).ToList();
         }
 
         public async Task<ProductCommonResponseDto> GetProductById(string id, UserDto userDto)
         {
+            if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                Console.WriteLine("Invalid product id or user.");
+                return null;
+            }
             var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
-
             if (product == null)
             {
-                throw new Exception(CommonMessages.ProductNotFound);
+                Console.WriteLine("Product not found or deleted.");
+                return null;
             }
-
             var favoriteProductIds = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).Select(f => f.ProductId).ToListAsync();
-
             var productDto = new ProductCommonResponseDto
             {
                 Id = id,
@@ -164,16 +170,18 @@ namespace eMart.Service.Core.Repositories
                 IsDeleted = product.IsDeleted,
                 IsFavorite = favoriteProductIds.Contains(product.Id)
             };
-
             return productDto;
         }
 
         public async Task<List<ProductCommonResponseDto>> GetProductsByCategoryId(string id, UserDto userDto)
         {
+            if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                Console.WriteLine("Invalid category id or user.");
+                return new List<ProductCommonResponseDto>();
+            }
             var query = dbContext.Products.Where(x => x.CategoryId == id && x.IsDeleted == false);
-
             var favoriteProductIds = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).Select(f => f.ProductId).ToListAsync();
-
             var products = await query.Select(p => new ProductCommonResponseDto
             {
                 Id = p.Id,
@@ -195,19 +203,22 @@ namespace eMart.Service.Core.Repositories
                 IsDeleted = p.IsDeleted,
                 IsFavorite = favoriteProductIds.Contains(p.Id)
             }).ToListAsync();
-
             return products;
         }
 
         public async Task<ProductCommonResponseDto> UpdateProduct(string id, ProductCreateRequestDto productCreateRequestDto, UserDto userDto)
         {
-            var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id);
-
-            if (product == null)
+            if (string.IsNullOrWhiteSpace(id) || productCreateRequestDto == null || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
+                Console.WriteLine("Invalid product id, data, or user.");
                 return null;
             }
-
+            var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
+            if (product == null)
+            {
+                Console.WriteLine("Product not found or deleted.");
+                return null;
+            }
             product.Name = productCreateRequestDto.Name;
             product.Description = productCreateRequestDto.Description;
             product.Price = productCreateRequestDto.Price;
@@ -219,9 +230,7 @@ namespace eMart.Service.Core.Repositories
             product.Status = productCreateRequestDto.Status;
             product.UpdatedAt = DateTime.UtcNow;
             product.UpdatedBy = userDto.Id;
-
             await dbContext.SaveChangesAsync();
-
             return new ProductCommonResponseDto()
             {
                 Id = product.Id,

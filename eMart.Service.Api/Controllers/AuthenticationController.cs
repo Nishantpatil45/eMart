@@ -69,12 +69,22 @@ namespace eMart.Service.Api.Controllers
 
         [HttpGet("logout")]
         [Authorize]
-        public async Task<IActionResult> Logout() 
+        public async Task<IActionResult> Logout()
         {
             try
             {
-                var accessToekn = await this.HttpContext.GetTokenAsync("access_token");
-                var logoutUser = this._authRepository.Logout(accessToekn);
+                var accessToken = Request.Cookies["refresh_token"];
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    return this.BadRequest(new CommonErrorResponse()
+                    {
+                        Path = "/error",
+                        Message = "Refresh token is missing.",
+                        Status = CommonStatusCode.BadRequest,
+                    });
+                }
+
+                var logoutUser = this._authRepository.Logout(accessToken);
                 if (logoutUser == null)
                 {
                     return this.NotFound(new CommonErrorResponse()
@@ -99,10 +109,11 @@ namespace eMart.Service.Api.Controllers
 
         [HttpGet("refresh-token")]
         //[AllowAnonymous]
-        public IActionResult RefreshToken(string refreshToken)
+        public IActionResult RefreshToken()
         {
             try
             {
+                var refreshToken = Request.Cookies["refresh_token"];
                 var token = this._authRepository.RefreshToken(refreshToken);
                 if (token == null)
                 {

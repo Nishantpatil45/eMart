@@ -11,7 +11,7 @@ namespace eMart.Service.Core.Interfaces
 {
     public interface ICategoryRepository
     {
-        CategoryCommonResponseDto CreateCategory(CategoryCreateRequestDto categoryCreateRequestDto);
+        Task<CategoryCommonResponseDto> CreateCategory(CategoryCreateRequestDto categoryCreateRequestDto);
 
         Task<List<CategoryCommonResponseDto>> GetAllCategories();
 

@@ -1,6 +1,7 @@
 ﻿using eMart.Service.Core.Dtos.Common;
 using eMart.Service.Core.Dtos.Product;
 using eMart.Service.Core.Interfaces;
+using eMart.Service.Core.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,9 +13,11 @@ namespace eMart.Service.Api.Controllers
     public class ProductController : BaseController
     {
         private readonly IProductRepository _productRepository;
-        public ProductController(IUserRepository userRepository, IProductRepository productRepository) : base(userRepository)
+        private readonly IRecentlyViewedRepository _recentlyViewedRepository;
+        public ProductController(IUserRepository userRepository, IProductRepository productRepository, IRecentlyViewedRepository recentlyViewedRepository) : base(userRepository)
         {
             _productRepository = productRepository;
+            _recentlyViewedRepository = recentlyViewedRepository;
         }
 
         [HttpPost("AddProduct")]
@@ -27,10 +30,26 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (productCreateRequestDto == null)
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/AddProduct",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product data."
+                    });
+                }
                 var newProduct = await _productRepository.CreateProduct(productCreateRequestDto, loggedInUser);
-
-                return Ok(new CommonResponse<ProductCommonResponseDto>()
+                if (newProduct == null)
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/AddProduct",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Failed to create product."
+                    });
+                }
+                return Ok(new CommonResponse<ProductCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = newProduct,
@@ -39,11 +58,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in AddProduct: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/AddProduct",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -58,10 +78,8 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
                 var products = await _productRepository.GetProduct(loggedInUser);
-
-                return Ok(new CommonResponse<List<ProductCommonResponseDto>>()
+                return Ok(new CommonResponse<List<ProductCommonResponseDto>>
                 {
                     Code = CommonStatusCode.Success,
                     Data = products,
@@ -70,11 +88,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in GetAllProducts: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Product/list",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -89,9 +108,28 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product id."
+                    });
+                }
                 var product = await _productRepository.GetProductById(id, loggedInUser);
-                return Ok(new CommonResponse<ProductCommonResponseDto>()
+                if (product == null)
+                {
+                    return NotFound(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.NotFound,
+                        Message = CommonMessages.ProductNotFound
+                    });
+                }
+                // Track recently viewed product
+                await _recentlyViewedRepository.AddRecentlyViewed(id, loggedInUser.Id);
+                return Ok(new CommonResponse<ProductCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = product,
@@ -100,11 +138,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in GetProductById: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Product/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -119,10 +158,17 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/Category/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid category id."
+                    });
+                }
                 var products = await _productRepository.GetProductsByCategoryId(id, loggedInUser);
-
-                return Ok(new CommonResponse<List<ProductCommonResponseDto>>()
+                return Ok(new CommonResponse<List<ProductCommonResponseDto>>
                 {
                     Code = CommonStatusCode.Success,
                     Data = products,
@@ -131,11 +177,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in GetAllProductsByCategoryId: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Product/Category/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -150,20 +197,26 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id) || productCreateRequestDto == null)
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product id or data."
+                    });
+                }
                 var product = await _productRepository.UpdateProduct(id, productCreateRequestDto, loggedInUser);
-
                 if (product == null)
                 {
                     return NotFound(new Core.Dtos.Common.CommonErrorResponse()
                     {
-                        Path = "/error",
+                        Path = "/api/v1/Product/{id}",
                         Status = CommonStatusCode.NotFound,
                         Message = CommonMessages.ProductNotFound
                     });
                 }
-
-                return Ok(new CommonResponse<ProductCommonResponseDto>()
+                return Ok(new CommonResponse<ProductCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = product,
@@ -172,11 +225,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in UpdateProduct: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Product/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -191,10 +245,26 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product id."
+                    });
+                }
                 var product = await _productRepository.DeleteProduct(id, loggedInUser);
-
-                return Ok(new CommonResponse<ProductCommonResponseDto>()
+                if (product == null)
+                {
+                    return NotFound(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.NotFound,
+                        Message = CommonMessages.ProductNotFound
+                    });
+                }
+                return Ok(new CommonResponse<ProductCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = product,
@@ -203,11 +273,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in DeleteProduct: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Product/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }

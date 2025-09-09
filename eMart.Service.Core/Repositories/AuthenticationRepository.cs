@@ -34,10 +34,9 @@ namespace eMart.Service.Core.Repositories
                     Error = "Not Found",
                 };
             }
-            var existingHashPassword = loginDto.Password;
-            if (!VerifyPasswordHash(loginDto.Password, existingUser.PasswordHash, existingUser.PasswordSolt))
-            {
 
+            if (!VerifyPasswordHash(loginDto.Password, existingUser.PasswordHash, existingUser.PasswordSalt))
+            {
                 return new UserAuthResponseDto
                 {
                     Error = "PasswordInvalid",
@@ -59,22 +58,26 @@ namespace eMart.Service.Core.Repositories
             };
             var accessToken = GenerateJwtToken(userCommonResponseDto);
 
-            // Generate new Refresh Token
+            // Generate new Refresh Token (raw)
             var refreshToken = GenerateRefreshToken();
             var refreshTokenExpriry = DateTime.UtcNow.AddDays(7);
 
-            SetRefreshToken(refreshToken);
+            // Set cookie with raw refresh token
+            SetRefreshToken(refreshToken.RefreshToken, refreshTokenExpriry);
 
-            // Save Refresh Token in UserTokens table
+            // Hash the refresh token before storing in DB
+            var refreshTokenHash = ComputeSha256Hash(refreshToken.RefreshToken);
+
+            // Save Refresh Token in UserTokens table (store hashed token)
             var newUserToken = new UserToken
             {
                 UserId = existingUser.Id,
                 AccessToken = accessToken,
-                RefreshToken = refreshToken.RefreshToken,
+                RefreshToken = refreshTokenHash,
                 RefreshTokenExpiry = refreshTokenExpriry,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                IsRevoked= false
+                IsRevoked = false
             };
 
             dbContext.UserTokens.Add(newUserToken);
@@ -95,30 +98,35 @@ namespace eMart.Service.Core.Repositories
 
         public UserAuthResponseDto Logout(string refreshToken)
         {
-            // Validate and decode the access token
-            var handler = new JwtSecurityTokenHandler();
-            var jwtToken = handler.ReadJwtToken(refreshToken);
-            if (jwtToken == null)
+            if (string.IsNullOrEmpty(refreshToken))
             {
                 return null;
             }
 
-            // Extract the UserId from the claims
-            var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            // Always hash the incoming refresh token before searching
+            var refreshTokenHash = ComputeSha256Hash(refreshToken);
+            var tokenRecord = dbContext.UserTokens.FirstOrDefault(ut => ut.RefreshToken == refreshTokenHash);
+            if (tokenRecord == null)
             {
                 return null;
             }
 
-            // Find all refresh tokens for the user
+            var userId = tokenRecord.UserId;
+
+            // Find all refresh tokens for the user and revoke them
             var userTokens = dbContext.UserTokens.Where(x => x.UserId == userId).ToList();
             if (!userTokens.Any())
             {
                 return null;
             }
 
-            // Remove all associated tokens from the database
-            dbContext.UserTokens.RemoveRange(userTokens);
+            foreach (var t in userTokens)
+            {
+                t.IsRevoked = true;
+                t.UpdatedAt = DateTime.UtcNow;
+            }
+
+            dbContext.UserTokens.UpdateRange(userTokens);
             dbContext.SaveChanges();
 
             var logoutResponse = new UserAuthResponseDto
@@ -136,7 +144,13 @@ namespace eMart.Service.Core.Repositories
 
         public TokenDto RefreshToken(string token)
         {
-            var userToken = dbContext.UserTokens.Include(ut => ut.User).FirstOrDefault(ut => ut.RefreshToken == token);
+            if (string.IsNullOrEmpty(token))
+            {
+                return null;
+            }
+
+            var tokenHash = ComputeSha256Hash(token);
+            var userToken = dbContext.UserTokens.Include(ut => ut.User).FirstOrDefault(ut => ut.RefreshToken == tokenHash);
 
             if (userToken == null || userToken.IsRevoked || userToken.RefreshTokenExpiry < DateTime.UtcNow)
             {
@@ -158,27 +172,35 @@ namespace eMart.Service.Core.Repositories
             };
             var newAccessToken = GenerateJwtToken(userCommonResponseDto);
 
-            // Generate new Refresh Token
+            // Generate new Refresh Token (raw)
             var refreshToken = GenerateRefreshToken();
             var refreshTokenExpriry = DateTime.UtcNow.AddDays(7);
 
             // Revoke the old refresh token
             userToken.IsRevoked = true;
+            userToken.UpdatedAt = DateTime.UtcNow;
+            dbContext.UserTokens.Update(userToken);
 
-            // Save Refresh Token in UserTokens table
+            // Hash the new refresh token before storing
+            var newRefreshTokenHash = ComputeSha256Hash(refreshToken.RefreshToken);
+
+            // Save new Refresh Token in UserTokens table (not revoked)
             var newUserToken = new UserToken
             {
                 UserId = userToken.User.Id,
                 AccessToken = newAccessToken,
-                RefreshToken = refreshToken.RefreshToken,
+                RefreshToken = newRefreshTokenHash,
                 RefreshTokenExpiry = refreshTokenExpriry,
-                IsRevoked = userToken.IsRevoked,
-                CreatedAt = userToken.CreatedAt,
+                IsRevoked = false,
+                CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             dbContext.UserTokens.Add(newUserToken);
             dbContext.SaveChanges();
+
+            // Update cookie with new raw refresh token
+            SetRefreshToken(refreshToken.RefreshToken, refreshTokenExpriry);
 
             var newToken = new TokenDto
             {
@@ -192,22 +214,33 @@ namespace eMart.Service.Core.Repositories
         public string GenerateJwtToken(UserCommonResponseDto user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]));
+            var keyValue = jwtSettings["Key"];
+            var issuer = jwtSettings["Issuer"];
+            var audience = jwtSettings["Audience"];
+            var duration = jwtSettings["DurationInMinutes"];
+
+            if (string.IsNullOrEmpty(keyValue) || string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(audience) || string.IsNullOrEmpty(duration))
+            {
+                throw new InvalidOperationException("JWT configuration is missing or incomplete. Please check JwtSettings in configuration.");
+            }
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(keyValue));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.Name),
-            new Claim(ClaimTypes.Role, user.Role)
-        };
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new Claim(ClaimTypes.Name, user.Name ?? string.Empty),
+                new Claim(ClaimTypes.Role, user.Role ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
 
             var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
+                issuer: issuer,
+                audience: audience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["DurationInMinutes"])),
+                expires: DateTime.UtcNow.AddMinutes(double.Parse(duration)),
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -223,25 +256,37 @@ namespace eMart.Service.Core.Repositories
             return refreshToken;
         }
 
-        private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSolt)
+        private static string ComputeSha256Hash(string rawData)
         {
-            using (var hmac = new HMACSHA512(passwordSolt))
+            using var sha256 = SHA256.Create();
+            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+            var sb = new StringBuilder();
+            foreach (var b in bytes)
+            {
+                sb.Append(b.ToString("x2"));
+            }
+            return sb.ToString();
+        }
+
+        private bool VerifyPasswordHash(string password, byte[] passwordHash, byte[] passwordSalt)
+        {
+            using (var hmac = new HMACSHA512(passwordSalt))
             {
                 var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
                 return computedHash.SequenceEqual(passwordHash);
             }
         }
 
-        private void SetRefreshToken(TokenDto newRefreshToken)
+        private void SetRefreshToken(string rawRefreshToken, DateTime expires)
         {
             if (_httpContextAccessor.HttpContext != null)
             {
-                _httpContextAccessor.HttpContext.Response.Cookies.Append("access_token", newRefreshToken.RefreshToken, new CookieOptions
+                _httpContextAccessor.HttpContext.Response.Cookies.Append("refresh_token", rawRefreshToken, new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = DateTime.UtcNow.AddDays(7) // Set cookie expiration
+                    Expires = expires
                 });
             }
             else

@@ -27,19 +27,25 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Favorite/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product id."
+                    });
+                }
                 var product = await _favoriteRepository.AddToFavorite(id, loggedInUser);
-
                 if (product == null)
                 {
-                    return BadRequest(new CommonResponse<FavoriteCommonResponseDto>()
+                    return BadRequest(new CommonResponse<FavoriteCommonResponseDto>
                     {
                         Code = CommonStatusCode.BadRequest,
                         Message = CommonMessages.AlreadyInFavorite
                     });
                 }
-
-                return Ok(new CommonResponse<FavoriteCommonResponseDto>()
+                return Ok(new CommonResponse<FavoriteCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = product,
@@ -48,11 +54,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in AddToFavorite: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Favorite/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -67,10 +74,8 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
                 var favoritesProducts = await _favoriteRepository.GetAllFavoriteForLoggedInUser(loggedInUser);
-
-                return Ok(new CommonResponse<List<FavoriteCommonResponseDto>>()
+                return Ok(new CommonResponse<List<FavoriteCommonResponseDto>>
                 {
                     Code = CommonStatusCode.Success,
                     Data = favoritesProducts,
@@ -79,11 +84,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in GetAllFavoriteProducts: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Favorite/list",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
@@ -98,15 +104,26 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Favorite/{id}",
+                        Status = CommonStatusCode.BadRequest,
+                        Message = "Invalid product id."
+                    });
+                }
                 var result = await _favoriteRepository.RemoveFromFavorite(id, loggedInUser);
-
                 if (result == null)
                 {
-                    return NotFound();
+                    return NotFound(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Favorite/{id}",
+                        Status = CommonStatusCode.NotFound,
+                        Message = CommonMessages.FavoriteNotFound
+                    });
                 }
-
-                return Ok(new CommonResponse<FavoriteCommonResponseDto>()
+                return Ok(new CommonResponse<FavoriteCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = result,
@@ -115,11 +132,12 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                Console.WriteLine($"Error in RemoveFromFavorite: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/Favorite/{id}",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }

@@ -23,8 +23,21 @@ namespace eMart.Service.Core.Repositories
         }
         public async Task<FavoriteCommonResponseDto> AddToFavorite(string id, UserDto userDto)
         {
+            if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                // Log error
+                Console.WriteLine("Invalid product id or user.");
+                return null;
+            }
+            // Check if user or product is deleted
+            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userDto.Id && (u.IsDeleted == null || u.IsDeleted == false));
+            var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id && (p.IsDeleted == null || p.IsDeleted == false));
+            if (user == null || product == null)
+            {
+                Console.WriteLine("User or product not found or deleted.");
+                return null;
+            }
             var productExits = await dbContext.Favorites.FirstOrDefaultAsync(x => x.ProductId == id && x.UserId == userDto.Id);
-
             if (productExits == null)
             {
                 var favorite = new Favorite
@@ -35,13 +48,11 @@ namespace eMart.Service.Core.Repositories
                 };
                 await dbContext.Favorites.AddAsync(favorite);
                 await dbContext.SaveChangesAsync();
-
                 return new FavoriteCommonResponseDto
                 {
                     UserId = userDto.Id,
                     ProductId = id
                 };
-
             }
             else
             {
@@ -51,24 +62,43 @@ namespace eMart.Service.Core.Repositories
 
         public async Task<List<FavoriteCommonResponseDto>> GetAllFavoriteForLoggedInUser(UserDto userDto)
         {
-            var favoriteProducts = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).ToListAsync();
-
-            if (favoriteProducts.Any())
+            if (userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                return favoriteProducts.Select(favoriteProducts => new FavoriteCommonResponseDto
-                {
-                    UserId = userDto.Id,
-                    ProductId = favoriteProducts.ProductId
-                }).ToList();
+                Console.WriteLine("Invalid user.");
+                return new List<FavoriteCommonResponseDto>();
             }
-            else
+            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userDto.Id && (u.IsDeleted == null || u.IsDeleted == false));
+            if (user == null)
             {
-                throw new Exception(CommonMessages.FavoriteNotFound);
+                Console.WriteLine("User not found or deleted.");
+                return new List<FavoriteCommonResponseDto>();
             }
+            var favoriteProducts = await dbContext.Favorites
+                .Where(f => f.UserId == userDto.Id)
+                .Include(f => f.Product)
+                .Where(f => f.Product != null && (f.Product.IsDeleted == null || f.Product.IsDeleted == false))
+                .ToListAsync();
+            return favoriteProducts.Select(favorite => new FavoriteCommonResponseDto
+            {
+                UserId = userDto.Id,
+                ProductId = favorite.ProductId
+            }).ToList();
         }
 
         public async Task<FavoriteCommonResponseDto> RemoveFromFavorite(string id, UserDto userDto)
         {
+            if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
+            {
+                Console.WriteLine("Invalid product id or user.");
+                return null;
+            }
+            var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userDto.Id && (u.IsDeleted == null || u.IsDeleted == false));
+            var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id && (p.IsDeleted == null || p.IsDeleted == false));
+            if (user == null || product == null)
+            {
+                Console.WriteLine("User or product not found or deleted.");
+                return null;
+            }
             var productExits = await dbContext.Favorites.FirstOrDefaultAsync(x => x.ProductId == id && x.UserId == userDto.Id);
             if (productExits == null)
             {
@@ -78,7 +108,6 @@ namespace eMart.Service.Core.Repositories
             {
                 dbContext.Favorites.Remove(productExits);
                 await dbContext.SaveChangesAsync();
-
                 return new FavoriteCommonResponseDto
                 {
                     UserId = userDto.Id,

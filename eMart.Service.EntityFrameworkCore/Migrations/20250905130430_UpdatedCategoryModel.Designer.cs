@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using eMart.Service.EntityFrameworkCore;
 
@@ -11,9 +12,11 @@ using eMart.Service.EntityFrameworkCore;
 namespace eMart.Service.EntityFrameworkCore.Migrations
 {
     [DbContext(typeof(eMartDbContext))]
-    partial class eMartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250905130430_UpdatedCategoryModel")]
+    partial class UpdatedCategoryModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

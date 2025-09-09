@@ -15,20 +15,17 @@ namespace eMart.Service.Core.Repositories
         {
             dbContext = _dbContext;
         }
-        public CategoryCommonResponseDto CreateCategory(CategoryCreateRequestDto categoryCreateRequestDto)
+        public async Task<CategoryCommonResponseDto> CreateCategory(CategoryCreateRequestDto categoryCreateRequestDto)
         {
-            var categoryExits = dbContext.Categorys.FirstOrDefault(x => x.Name == categoryCreateRequestDto.Name);
-
+            var categoryExits = await dbContext.Categorys.FirstOrDefaultAsync(x => x.Name == categoryCreateRequestDto.Name && (x.IsDeleted == null || x.IsDeleted == false));
             if (categoryExits == null)
             {
                 var Category = new Category
                 {
                     Name = categoryCreateRequestDto.Name
                 };
-
-                // Save to database
                 dbContext.Categorys.Add(Category);
-                dbContext.SaveChanges();
+                await dbContext.SaveChangesAsync();
                 return new CategoryCommonResponseDto
                 {
                     Id = Category.Id,
@@ -43,52 +40,39 @@ namespace eMart.Service.Core.Repositories
 
         public async Task<List<CategoryCommonResponseDto>> GetAllCategories()
         {
-            var categories = dbContext.Categorys.ToList();
-
-            if (categories.Any())
+            var categories = await dbContext.Categorys.Where(x => x.IsDeleted == null || x.IsDeleted == false).ToListAsync();
+            return categories.Select(category => new CategoryCommonResponseDto
             {
-                return categories.Select(category => new CategoryCommonResponseDto
-                {
-                    Id = category.Id,
-                    CategoryName = category.Name
-                }).ToList();
-            }
-            else
-            {
-                return null;
-            }
+                Id = category.Id,
+                CategoryName = category.Name
+            }).ToList();
         }
 
         public async Task<CategoryCommonResponseDto> GetCategoryById(string id)
         {
-            var category = await dbContext.Categorys.FirstOrDefaultAsync(x => x.Id == id);
-
+            var category = await dbContext.Categorys.FirstOrDefaultAsync(x => x.Id == id && (x.IsDeleted == null || x.IsDeleted == false));
             if (category == null)
             {
-                throw new Exception(CommonMessages.CategoryNotFound);
+                // Do not throw raw exception, return null
+                return null;
             }
-
             var categoryDto = new CategoryCommonResponseDto
             {
                 Id = category.Id,
                 CategoryName = category.Name
             };
-
             return categoryDto;
         }
 
         public async Task<CategoryCommonResponseDto> UpdateCategory(string id, CategoryCreateRequestDto categoryCreateRequestDto, UserDto userDto)
         {
-            var category = await dbContext.Categorys.FirstOrDefaultAsync(x => x.Id == id);
-
+            var category = await dbContext.Categorys.FirstOrDefaultAsync(x => x.Id == id && (x.IsDeleted == null || x.IsDeleted == false));
             if (category == null)
             {
                 return null;
             }
-
             category.Name = categoryCreateRequestDto.Name;
             await dbContext.SaveChangesAsync();
-
             return new CategoryCommonResponseDto()
             {
                 Id = category.Id,

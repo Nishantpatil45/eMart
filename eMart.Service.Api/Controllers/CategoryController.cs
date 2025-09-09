@@ -22,13 +22,31 @@ namespace eMart.Service.Api.Controllers
         }
 
         [HttpPost("AddCategory")]
-        public ActionResult AddCategory(CategoryCreateRequestDto categoryCreateRequestDto)
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> AddCategory([FromBody] CategoryCreateRequestDto categoryCreateRequestDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new CommonErrorResponse
+                {
+                    Path = "/api/v1/AddCategory",
+                    Message = "Invalid input data.",
+                    Status = CommonStatusCode.BadRequest
+                });
+            }
             try
             {
-                var newCategory = _categoryRepository.CreateCategory(categoryCreateRequestDto);
-
-                return Ok(new CommonResponse<CategoryCommonResponseDto>()
+                var newCategory = await _categoryRepository.CreateCategory(categoryCreateRequestDto);
+                if (newCategory == null)
+                {
+                    return Conflict(new CommonErrorResponse
+                    {
+                        Path = "/api/v1/AddCategory",
+                        Message = CommonMessages.CategoryIsAlredyExits,
+                        Status = CommonStatusCode.Conflict
+                    });
+                }
+                return Ok(new CommonResponse<CategoryCommonResponseDto>
                 {
                     Code = CommonStatusCode.Success,
                     Data = newCategory,
@@ -37,11 +55,13 @@ namespace eMart.Service.Api.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new CommonErrorResponse()
+                // Log error (use ILogger in production)
+                Console.WriteLine($"Error in AddCategory: {ex.Message}");
+                return StatusCode(500, new CommonErrorResponse
                 {
-                    Path = "/error",
-                    Status = CommonStatusCode.BadRequest,
-                    Message = ex.Message,
+                    Path = "/api/v1/AddCategory",
+                    Status = CommonStatusCode.InternalServerError,
+                    Message = "An unexpected error occurred. Please try again later."
                 });
             }
         }
