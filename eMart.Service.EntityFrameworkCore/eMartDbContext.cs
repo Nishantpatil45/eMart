@@ -10,11 +10,13 @@ namespace eMart.Service.EntityFrameworkCore
         public DbSet<UserPreference> UserPreferences { get; set; }
         public DbSet<Product> Products { get; set; }
         public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
         public DbSet<Bid> Bids { get; set; }
         public DbSet<Favorite> Favorites { get; set; }
         public DbSet<RecentlyViewed> RecentlyViewedItems { get; set; }
         public DbSet<UserToken> UserTokens { get; set; }
         public DbSet<Category> Categorys { get; set; }
+        public DbSet<UserOtp> UserOtps { get; set; }
 
 
         public eMartDbContext(DbContextOptions<eMartDbContext> options) : base(options)
@@ -57,10 +59,21 @@ namespace eMart.Service.EntityFrameworkCore
                 .WithOne(o => o.Buyer)
                 .HasForeignKey(o => o.BuyerId);
 
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.OrderItems)
+                .WithOne(oi => oi.Seller)
+                .HasForeignKey(oi => oi.SellerId);
+
+            modelBuilder.Entity<Order>()
+                .HasMany(o => o.OrderItems)
+                .WithOne(oi => oi.Order)
+                .HasForeignKey(oi => oi.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             modelBuilder.Entity<Product>()
-                .HasMany(p => p.Orders)
-                .WithOne(o => o.Product)
-                .HasForeignKey(o => o.ProductId);
+                .HasMany(p => p.OrderItems)
+                .WithOne(oi => oi.Product)
+                .HasForeignKey(oi => oi.ProductId);
 
             modelBuilder.Entity<Product>()
                 .HasMany(p => p.Bids)
@@ -88,6 +101,12 @@ namespace eMart.Service.EntityFrameworkCore
                 .WithMany(c => c.Products)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserOtp>()
+                .HasOne(uo => uo.User)
+                .WithMany(u => u.UserOtps)
+                .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

@@ -37,6 +37,10 @@ namespace eMart.Service.Core.Dtos.Common
         public const string UserNotActive = "User is InActive";
         public const string UserEmailSubject = "User Details";
         public const string UserEmailSuccessResponse = "Email Sent Successfully";
+        public const string UserFound = "User found successfully.";
+        public const string UserUpdatedSuccessfully = "User updated successfully.";
+        public const string UserDeletedSuccessfully = "User deleted successfully.";
+        public const string UsersFound = "Users found successfully.";
 
         // Product Messages
 
@@ -84,6 +88,7 @@ namespace eMart.Service.Core.Dtos.Common
         public const string VisitorChartCountSuccessfully = "Successfully fetch graph data.";
         public const string DataSuccessfully = "Successfully fetch data.";
         public const string EmailSentSuccessfully = "Email sent !";
+        public const string Unauthorized = "Unauthorized";
 
         // Category messages
         public const string CategoryAddedSuccessfully = "Added Category successfully.";
@@ -93,6 +98,9 @@ namespace eMart.Service.Core.Dtos.Common
         public const string CategoryPasswordNotValid = "Entered Old password is not valid.";
         public const string CategoryPasswordChange = "Password changed successfully.";
         public const string CategoryEditSuccessfully = "Successfully edited Category Details.";
+        public const string CategoryUpdatedSuccessfully = "Category updated successfully.";
+        public const string CategoryDeletedSuccessfully = "Category deleted successfully.";
+        public const string CategoriesFound = "Categories found successfully.";
 
         // Favorite messages
         public const string ProductAddedInFavorite = "Product Added into Favorite successfully.";

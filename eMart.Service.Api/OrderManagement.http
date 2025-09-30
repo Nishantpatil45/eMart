@@ -1,0 +1,79 @@
+### Order Management System API Tests
+
+@baseUrl = https://localhost:7001/api
+@token = your_jwt_token_here
+
+### Create a new order
+POST {{baseUrl}}/order
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "buyerId": "user-id-here",
+  "paymentMethod": "credit_card",
+  "shippingAddress": "123 Main St, City, State, 12345",
+  "billingAddress": "123 Main St, City, State, 12345",
+  "notes": "Please deliver during business hours",
+  "taxAmount": 10.50,
+  "shippingAmount": 5.99,
+  "orderItems": [
+    {
+      "productId": "product-id-1",
+      "quantity": 2,
+      "unitPrice": 29.99
+    },
+    {
+      "productId": "product-id-2", 
+      "quantity": 1,
+      "unitPrice": 49.99
+    }
+  ]
+}
+
+### Get order by ID
+GET {{baseUrl}}/order/order-id-here
+Authorization: Bearer {{token}}
+
+### Get order by order number
+GET {{baseUrl}}/order/number/ORD-20250101-ABC12345
+Authorization: Bearer {{token}}
+
+### Get my orders (for logged-in user)
+GET {{baseUrl}}/order/my-orders?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Get all orders (admin only)
+GET {{baseUrl}}/order?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Get seller orders (admin only)
+GET {{baseUrl}}/order/seller/seller-id-here?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### Update order status (admin only)
+PUT {{baseUrl}}/order/order-id-here/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "shipped",
+  "notes": "Order has been shipped via UPS"
+}
+
+### Update payment status (admin only)
+PUT {{baseUrl}}/order/order-id-here/payment-status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "paymentStatus": "paid",
+  "notes": "Payment confirmed via credit card"
+}
+
+### Cancel order (buyer only)
+PUT {{baseUrl}}/order/order-id-here/cancel
+Authorization: Bearer {{token}}
+
+### Get order statistics (admin only)
+GET {{baseUrl}}/order/statistics?sellerId=seller-id-here&startDate=2025-01-01&endDate=2025-12-31
+Authorization: Bearer {{token}}

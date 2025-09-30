@@ -12,5 +12,6 @@ namespace eMart.Service.Core.Interfaces
         public UserAuthResponseDto Login(LoginDto loginDto);
         public UserAuthResponseDto Logout(string refreshToken);
         public TokenDto RefreshToken(string token);
+        UserAuthResponseDto VerifyOtp(string userId, string otpCode);
     }
 }

@@ -9,5 +9,7 @@ namespace eMart.Service.Core.Interfaces
         Task<UserCommonResponseDto> CreateUser(UserCreateRequestDto userCreateRequestDto, UserDto userDto);
 
         Task<UserDto> GetUserDetails(string emailId);
+
+        Task<UserDto> GetUserDetailsById(string userId);
     }
 }

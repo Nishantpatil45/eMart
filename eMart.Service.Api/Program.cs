@@ -1,8 +1,12 @@
+using eMart.Service.Core.Authorization.Handlers;
+using eMart.Service.Core.Authorization.Requirements;
 using eMart.Service.Core.Interfaces;
 using eMart.Service.Core.Registrations;
 using eMart.Service.Core.Repositories;
+using eMart.Service.Core.Services;
 using eMart.Service.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -18,6 +22,11 @@ builder.Services.AddDbContext<eMartDbContext>(options =>
     ));
 
 builder.Services.AddHttpContextAccessor();
+
+// Add MediatR
+builder.Services.AddMediatR(cfg => {
+    cfg.RegisterServicesFromAssembly(typeof(eMart.Service.Core.Commands.Product.CreateProductCommand).Assembly);
+});
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -51,7 +60,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Configure JWT Authentication
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var jwtSettings = builder.Configuration.GetSection("Jwt");
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -67,9 +76,45 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"])),
+        ClockSkew = TimeSpan.Zero
     };
 });
+
+// Configure Authorization
+builder.Services.AddAuthorization(options =>
+{
+    // Role-based policies
+    options.AddPolicy("AdminOnly", policy => 
+        policy.Requirements.Add(new RoleRequirement("Admin")));
+    
+    options.AddPolicy("AdminOrSeller", policy => 
+        policy.Requirements.Add(new RoleRequirement("Admin", "Seller")));
+    
+    options.AddPolicy("UserOrAbove", policy => 
+        policy.Requirements.Add(new RoleRequirement("Admin", "Seller", "User")));
+    
+    // Two-factor authentication policies
+    options.AddPolicy("RequireTwoFactor", policy => 
+        policy.Requirements.Add(new TwoFactorRequirement(true)));
+    
+    // Combined policies
+    options.AddPolicy("AdminWithTwoFactor", policy => 
+    {
+        policy.Requirements.Add(new RoleRequirement("Admin"));
+        policy.Requirements.Add(new TwoFactorRequirement(true));
+    });
+    
+    options.AddPolicy("SellerWithTwoFactor", policy => 
+    {
+        policy.Requirements.Add(new RoleRequirement("Seller"));
+        policy.Requirements.Add(new TwoFactorRequirement(true));
+    });
+});
+
+// Register Authorization Handlers
+builder.Services.AddScoped<IAuthorizationHandler, RoleAuthorizationHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, TwoFactorAuthorizationHandler>();
 
 // Register Repositories
 builder.Services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
@@ -78,11 +123,20 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 builder.Services.AddScoped<IFavoriteRepository, FavoriteRepository>();
 builder.Services.AddScoped<IRecentlyViewedRepository, RecentlyViewedRepository>();
+builder.Services.AddScoped<IUserOtpRepository, UserOtpRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
-builder.Services.AddHttpsRedirection(options =>
-{
-    options.HttpsPort = 443;
-});
+// Register Services
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+// Register Enhanced Authentication Services
+builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<ITwoFactorAuthService, TwoFactorAuthService>();
+builder.Services.AddScoped<IEnhancedAuthenticationService, EnhancedAuthenticationService>();
 
 
 
@@ -94,6 +148,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("NgOrigins");
 
 app.UseHttpsRedirection();
 

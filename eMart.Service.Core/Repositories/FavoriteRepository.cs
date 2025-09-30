@@ -25,8 +25,7 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                // Log error
-                Console.WriteLine("Invalid product id or user.");
+                // Return null for invalid product id or user
                 return null;
             }
             // Check if user or product is deleted
@@ -34,7 +33,7 @@ namespace eMart.Service.Core.Repositories
             var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id && (p.IsDeleted == null || p.IsDeleted == false));
             if (user == null || product == null)
             {
-                Console.WriteLine("User or product not found or deleted.");
+                // Return null for user or product not found or deleted
                 return null;
             }
             var productExits = await dbContext.Favorites.FirstOrDefaultAsync(x => x.ProductId == id && x.UserId == userDto.Id);
@@ -64,13 +63,13 @@ namespace eMart.Service.Core.Repositories
         {
             if (userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid user.");
+                // Return empty list for invalid user
                 return new List<FavoriteCommonResponseDto>();
             }
             var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userDto.Id && (u.IsDeleted == null || u.IsDeleted == false));
             if (user == null)
             {
-                Console.WriteLine("User not found or deleted.");
+                // Return empty list for user not found or deleted
                 return new List<FavoriteCommonResponseDto>();
             }
             var favoriteProducts = await dbContext.Favorites
@@ -89,14 +88,14 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid product id or user.");
+                // Return null for invalid product id or user
                 return null;
             }
             var user = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userDto.Id && (u.IsDeleted == null || u.IsDeleted == false));
             var product = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == id && (p.IsDeleted == null || p.IsDeleted == false));
             if (user == null || product == null)
             {
-                Console.WriteLine("User or product not found or deleted.");
+                // Return null for user or product not found or deleted
                 return null;
             }
             var productExits = await dbContext.Favorites.FirstOrDefaultAsync(x => x.ProductId == id && x.UserId == userDto.Id);

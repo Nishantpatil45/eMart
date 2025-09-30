@@ -1,7 +1,7 @@
 ﻿using eMart.Service.Core.Dtos.Common;
 using eMart.Service.Core.Dtos.Product;
 using eMart.Service.Core.Interfaces;
-using eMart.Service.Core.Repositories;
+using eMart.Service.Core.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,12 +12,11 @@ namespace eMart.Service.Api.Controllers
     [Authorize]
     public class ProductController : BaseController
     {
-        private readonly IProductRepository _productRepository;
-        private readonly IRecentlyViewedRepository _recentlyViewedRepository;
-        public ProductController(IUserRepository userRepository, IProductRepository productRepository, IRecentlyViewedRepository recentlyViewedRepository) : base(userRepository)
+        private readonly IProductService _productService;
+        
+        public ProductController(IUserRepository userRepository, IProductService productService) : base(userRepository)
         {
-            _productRepository = productRepository;
-            _recentlyViewedRepository = recentlyViewedRepository;
+            _productService = productService;
         }
 
         [HttpPost("AddProduct")]
@@ -39,22 +38,26 @@ namespace eMart.Service.Api.Controllers
                         Message = "Invalid product data."
                     });
                 }
-                var newProduct = await _productRepository.CreateProduct(productCreateRequestDto, loggedInUser);
-                if (newProduct == null)
+
+                var result = await _productService.CreateProductAsync(productCreateRequestDto, loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    return BadRequest(new CommonErrorResponse
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.BadRequest => BadRequest(new CommonErrorResponse
                     {
                         Path = "/api/v1/AddProduct",
                         Status = CommonStatusCode.BadRequest,
-                        Message = "Failed to create product."
-                    });
-                }
-                return Ok(new CommonResponse<ProductCommonResponseDto>
-                {
-                    Code = CommonStatusCode.Success,
-                    Data = newProduct,
-                    Message = CommonMessages.ProductAddedSuccessfully
-                });
+                        Message = result.Message
+                    }),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/AddProduct",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {
@@ -78,13 +81,20 @@ namespace eMart.Service.Api.Controllers
                 {
                     return Unauthorized();
                 }
-                var products = await _productRepository.GetProduct(loggedInUser);
-                return Ok(new CommonResponse<List<ProductCommonResponseDto>>
+
+                var result = await _productService.GetAllProductsAsync(loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    Code = CommonStatusCode.Success,
-                    Data = products,
-                    Message = CommonMessages.ProductFound
-                });
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/list",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {
@@ -117,24 +127,26 @@ namespace eMart.Service.Api.Controllers
                         Message = "Invalid product id."
                     });
                 }
-                var product = await _productRepository.GetProductById(id, loggedInUser);
-                if (product == null)
+
+                var result = await _productService.GetProductByIdAsync(id, loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    return NotFound(new CommonErrorResponse
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.NotFound => NotFound(new CommonErrorResponse
                     {
                         Path = "/api/v1/Product/{id}",
                         Status = CommonStatusCode.NotFound,
-                        Message = CommonMessages.ProductNotFound
-                    });
-                }
-                // Track recently viewed product
-                await _recentlyViewedRepository.AddRecentlyViewed(id, loggedInUser.Id);
-                return Ok(new CommonResponse<ProductCommonResponseDto>
-                {
-                    Code = CommonStatusCode.Success,
-                    Data = product,
-                    Message = CommonMessages.ProductFound
-                });
+                        Message = result.Message
+                    }),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {
@@ -167,13 +179,20 @@ namespace eMart.Service.Api.Controllers
                         Message = "Invalid category id."
                     });
                 }
-                var products = await _productRepository.GetProductsByCategoryId(id, loggedInUser);
-                return Ok(new CommonResponse<List<ProductCommonResponseDto>>
+
+                var result = await _productService.GetProductsByCategoryAsync(id, loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    Code = CommonStatusCode.Success,
-                    Data = products,
-                    Message = CommonMessages.ProductFound
-                });
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/Category/{id}",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {
@@ -206,22 +225,26 @@ namespace eMart.Service.Api.Controllers
                         Message = "Invalid product id or data."
                     });
                 }
-                var product = await _productRepository.UpdateProduct(id, productCreateRequestDto, loggedInUser);
-                if (product == null)
+
+                var result = await _productService.UpdateProductAsync(id, productCreateRequestDto, loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    return NotFound(new Core.Dtos.Common.CommonErrorResponse()
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.NotFound => NotFound(new CommonErrorResponse
                     {
                         Path = "/api/v1/Product/{id}",
                         Status = CommonStatusCode.NotFound,
-                        Message = CommonMessages.ProductNotFound
-                    });
-                }
-                return Ok(new CommonResponse<ProductCommonResponseDto>
-                {
-                    Code = CommonStatusCode.Success,
-                    Data = product,
-                    Message = CommonMessages.ProductEditSuccessfully
-                });
+                        Message = result.Message
+                    }),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {
@@ -254,22 +277,26 @@ namespace eMart.Service.Api.Controllers
                         Message = "Invalid product id."
                     });
                 }
-                var product = await _productRepository.DeleteProduct(id, loggedInUser);
-                if (product == null)
+
+                var result = await _productService.DeleteProductAsync(id, loggedInUser.Email);
+                
+                return result.Code switch
                 {
-                    return NotFound(new CommonErrorResponse
+                    CommonStatusCode.Success => Ok(result),
+                    CommonStatusCode.NotFound => NotFound(new CommonErrorResponse
                     {
                         Path = "/api/v1/Product/{id}",
                         Status = CommonStatusCode.NotFound,
-                        Message = CommonMessages.ProductNotFound
-                    });
-                }
-                return Ok(new CommonResponse<ProductCommonResponseDto>
-                {
-                    Code = CommonStatusCode.Success,
-                    Data = product,
-                    Message = CommonMessages.ProductRemoved
-                });
+                        Message = result.Message
+                    }),
+                    CommonStatusCode.Unauthorized => Unauthorized(),
+                    _ => StatusCode(500, new CommonErrorResponse
+                    {
+                        Path = "/api/v1/Product/{id}",
+                        Status = CommonStatusCode.InternalServerError,
+                        Message = result.Message
+                    })
+                };
             }
             catch (Exception ex)
             {

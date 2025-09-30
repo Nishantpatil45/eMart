@@ -24,7 +24,7 @@ namespace eMart.Service.Core.Repositories
             {
                 if (productCreateRequestDto == null || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
                 {
-                    Console.WriteLine("Invalid product data or user.");
+                    // Return null for invalid product data or user
                     return null;
                 }
                 var newProduct = new Product
@@ -62,7 +62,7 @@ namespace eMart.Service.Core.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in CreateProduct: {ex.Message}");
+                // Return null for error
                 return null;
             }
         }
@@ -71,13 +71,13 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid product id or user.");
+                // Return null for invalid product id or user
                 return null;
             }
             var existingPoduct = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
             if (existingPoduct == null)
             {
-                Console.WriteLine("Product not found or already deleted.");
+                // Return null for product not found or already deleted
                 return null;
             }
             existingPoduct.IsDeleted = true;
@@ -106,7 +106,7 @@ namespace eMart.Service.Core.Repositories
         {
             if (userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid user.");
+                // Return empty list for invalid user
                 return new List<ProductCommonResponseDto>();
             }
             var favoriteProductIds = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).Select(f => f.ProductId).ToListAsync();
@@ -139,13 +139,13 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid product id or user.");
+                // Return null for invalid product id or user
                 return null;
             }
             var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
             if (product == null)
             {
-                Console.WriteLine("Product not found or deleted.");
+                // Return null for product not found or deleted
                 return null;
             }
             var favoriteProductIds = await dbContext.Favorites.Where(f => f.UserId == userDto.Id).Select(f => f.ProductId).ToListAsync();
@@ -177,7 +177,7 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid category id or user.");
+                // Return empty list for invalid category id or user
                 return new List<ProductCommonResponseDto>();
             }
             var query = dbContext.Products.Where(x => x.CategoryId == id && x.IsDeleted == false);
@@ -210,13 +210,13 @@ namespace eMart.Service.Core.Repositories
         {
             if (string.IsNullOrWhiteSpace(id) || productCreateRequestDto == null || userDto == null || string.IsNullOrWhiteSpace(userDto.Id))
             {
-                Console.WriteLine("Invalid product id, data, or user.");
+                // Return null for invalid product id, data, or user
                 return null;
             }
             var product = await dbContext.Products.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted == false);
             if (product == null)
             {
-                Console.WriteLine("Product not found or deleted.");
+                // Return null for product not found or deleted
                 return null;
             }
             product.Name = productCreateRequestDto.Name;

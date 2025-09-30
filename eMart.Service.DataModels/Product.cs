@@ -31,6 +31,7 @@ namespace eMart.Service.DataModels
         public User? Seller { get; set; }
         public Category? Category { get; set; }
         public ICollection<Order>? Orders { get; set; }
+        public ICollection<OrderItem>? OrderItems { get; set; }
         public ICollection<Bid>? Bids { get; set; }
         public ICollection<Favorite>? Favorites { get; set; }
         public ICollection<RecentlyViewed>? RecentlyViewedItems { get; set; }

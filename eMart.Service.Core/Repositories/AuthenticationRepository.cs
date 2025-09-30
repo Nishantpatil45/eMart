@@ -18,10 +18,13 @@ namespace eMart.Service.Core.Repositories
     {
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor;
-        public AuthenticationRepository(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, eMartDbContext dbContext) : base(dbContext)
+        private readonly IUserOtpRepository _userOtpReposiutory;
+
+        public AuthenticationRepository(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, IUserOtpRepository userOtpRepository, eMartDbContext dbContext) : base(dbContext)
         {
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
+            _userOtpReposiutory = userOtpRepository;
         }
 
         public UserAuthResponseDto Login(LoginDto loginDto)
@@ -43,35 +46,57 @@ namespace eMart.Service.Core.Repositories
                 };
             }
 
-            // Generate new Access Token
-            var userCommonResponseDto = new UserCommonResponseDto
-            {
-                Id = existingUser.Id,
-                Email = existingUser.Email,
-                PasswordHash = existingUser.PasswordHash,
-                Name = existingUser.Name,
-                Role = existingUser.Role,
-                ProfilePicture = existingUser.ProfilePicture,
-                DarkMode = existingUser.DarkMode,
-                CreatedAt = existingUser.CreatedAt,
-                UpdatedAt = existingUser.UpdatedAt
-            };
-            var accessToken = GenerateJwtToken(userCommonResponseDto);
-
-            // Generate new Refresh Token (raw)
-            var refreshToken = GenerateRefreshToken();
-            var refreshTokenExpriry = DateTime.UtcNow.AddDays(7);
-
-            // Set cookie with raw refresh token
-            SetRefreshToken(refreshToken.RefreshToken, refreshTokenExpriry);
-
-            // Hash the refresh token before storing in DB
-            var refreshTokenHash = ComputeSha256Hash(refreshToken.RefreshToken);
-
-            // Save Refresh Token in UserTokens table (store hashed token)
-            var newUserToken = new UserToken
+            // 2FA: Generate OTP and require verification
+            var otp = _userOtpReposiutory.GenerateOtpAsync(existingUser.Id).GetAwaiter().GetResult();
+            return new UserAuthResponseDto
             {
                 UserId = existingUser.Id,
+                Email = existingUser.Email,
+                Name = existingUser.Name,
+                Role = existingUser.Role,
+                Error = "OtpRequired"
+            };
+        }
+
+        public UserAuthResponseDto VerifyOtp(string userId, string otpCode)
+        {
+            var isValid = _userOtpReposiutory.VerifyOtpAsync(userId, otpCode).GetAwaiter().GetResult();
+            if (!isValid)
+            {
+                return new UserAuthResponseDto
+                {
+                    Error = "InvalidOtp"
+                };
+            }
+            var user = dbContext.Users.FirstOrDefault(x => x.Id == userId && (x.IsDeleted == null || x.IsDeleted == false));
+            if (user == null)
+            {
+                return new UserAuthResponseDto
+                {
+                    Error = "Not Found"
+                };
+            }
+            // Generate tokens as before
+            var userCommonResponseDto = new UserCommonResponseDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                PasswordHash = user.PasswordHash,
+                Name = user.Name,
+                Role = user.Role,
+                ProfilePicture = user.ProfilePicture,
+                DarkMode = user.DarkMode,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            };
+            var accessToken = GenerateJwtToken(userCommonResponseDto);
+            var refreshToken = GenerateRefreshToken();
+            var refreshTokenExpriry = DateTime.UtcNow.AddDays(7);
+            SetRefreshToken(refreshToken.RefreshToken, refreshTokenExpriry);
+            var refreshTokenHash = ComputeSha256Hash(refreshToken.RefreshToken);
+            var newUserToken = new UserToken
+            {
+                UserId = user.Id,
                 AccessToken = accessToken,
                 RefreshToken = refreshTokenHash,
                 RefreshTokenExpiry = refreshTokenExpriry,
@@ -79,21 +104,18 @@ namespace eMart.Service.Core.Repositories
                 UpdatedAt = DateTime.UtcNow,
                 IsRevoked = false
             };
-
             dbContext.UserTokens.Add(newUserToken);
             dbContext.SaveChanges();
-
-            var loginResponse = new UserAuthResponseDto
+            return new UserAuthResponseDto
             {
-                UserId = existingUser.Id,
-                Email = existingUser?.Email,
-                Name = existingUser?.Name,
-                Role = existingUser?.Role,
+                UserId = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                Role = user.Role,
                 AccessToken = accessToken,
                 RefreshToken = refreshToken.RefreshToken,
                 ExpiresIn = refreshTokenExpriry
             };
-            return loginResponse;
         }
 
         public UserAuthResponseDto Logout(string refreshToken)

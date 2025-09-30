@@ -21,6 +21,12 @@ namespace eMart.Service.Core.Registrations
             // Register Repository
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
+            services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<ICategoryRepository, CategoryRepository>();
+            services.AddScoped<IFavoriteRepository, FavoriteRepository>();
+            services.AddScoped<IRecentlyViewedRepository, RecentlyViewedRepository>();
+            services.AddScoped<IUserOtpRepository, UserOtpRepository>();
+            services.AddScoped<IOrderRepository, OrderRepository>();
 
 
             return services;

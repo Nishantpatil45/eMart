@@ -90,26 +90,72 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                     b.Property<string>("Id")
                         .HasColumnType("varchar(255)");
 
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(65,30)");
+                    b.Property<string>("BillingAddress")
+                        .HasColumnType("longtext");
 
                     b.Property<string>("BuyerId")
                         .IsRequired()
                         .HasColumnType("varchar(255)");
 
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("ProductId")
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool?>("IsDeleted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("OrderNumber")
                         .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ProductId")
                         .HasColumnType("varchar(255)");
 
-                    b.Property<string>("SellerId")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
+                    b.Property<DateTime?>("ShippedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ShippingAddress")
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("ShippingAmount")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedBy")
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");
@@ -118,9 +164,71 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.ToTable("Orders");
+                });
+
+            modelBuilder.Entity("eMart.Service.DataModels.OrderItem", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool?>("IsDeleted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("OrderId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ProductDescription")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ProductId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ProductImageUrl")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ProductName")
+                        .HasColumnType("longtext");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SellerId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ProductId");
+
                     b.HasIndex("SellerId");
 
-                    b.ToTable("Orders");
+                    b.ToTable("OrderItems");
                 });
 
             modelBuilder.Entity("eMart.Service.DataModels.Product", b =>
@@ -262,6 +370,44 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("eMart.Service.DataModels.UserOtp", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("Expiry")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("OtpCode")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("SecretKey")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserOtps");
+                });
+
             modelBuilder.Entity("eMart.Service.DataModels.UserPreference", b =>
                 {
                     b.Property<string>("UserId")
@@ -357,19 +503,34 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("eMart.Service.DataModels.Product", "Product")
+                    b.HasOne("eMart.Service.DataModels.Product", null)
                         .WithMany("Orders")
+                        .HasForeignKey("ProductId");
+
+                    b.Navigation("Buyer");
+                });
+
+            modelBuilder.Entity("eMart.Service.DataModels.OrderItem", b =>
+                {
+                    b.HasOne("eMart.Service.DataModels.Order", "Order")
+                        .WithMany("OrderItems")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("eMart.Service.DataModels.Product", "Product")
+                        .WithMany("OrderItems")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("eMart.Service.DataModels.User", "Seller")
-                        .WithMany()
+                        .WithMany("OrderItems")
                         .HasForeignKey("SellerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Buyer");
+                    b.Navigation("Order");
 
                     b.Navigation("Product");
 
@@ -412,6 +573,17 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("eMart.Service.DataModels.UserOtp", b =>
+                {
+                    b.HasOne("eMart.Service.DataModels.User", "User")
+                        .WithMany("UserOtps")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("eMart.Service.DataModels.UserPreference", b =>
                 {
                     b.HasOne("eMart.Service.DataModels.User", "User")
@@ -439,11 +611,18 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                     b.Navigation("Products");
                 });
 
+            modelBuilder.Entity("eMart.Service.DataModels.Order", b =>
+                {
+                    b.Navigation("OrderItems");
+                });
+
             modelBuilder.Entity("eMart.Service.DataModels.Product", b =>
                 {
                     b.Navigation("Bids");
 
                     b.Navigation("Favorites");
+
+                    b.Navigation("OrderItems");
 
                     b.Navigation("Orders");
 
@@ -456,6 +635,8 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
 
                     b.Navigation("Favorites");
 
+                    b.Navigation("OrderItems");
+
                     b.Navigation("Orders");
 
                     b.Navigation("Preferences");
@@ -463,6 +644,8 @@ namespace eMart.Service.EntityFrameworkCore.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("RecentlyViewedItems");
+
+                    b.Navigation("UserOtps");
 
                     b.Navigation("UserTokens");
                 });

@@ -21,9 +21,11 @@
         public ICollection<UserPreference> Preferences { get; set; }
         public ICollection<Product> Products { get; set; }
         public ICollection<Order> Orders { get; set; }
+        public ICollection<OrderItem> OrderItems { get; set; }
         public ICollection<Bid> Bids { get; set; }
         public ICollection<Favorite> Favorites { get; set; }
         public ICollection<RecentlyViewed> RecentlyViewedItems { get; set; }
         public ICollection<UserToken> UserTokens { get; set; }
+        public ICollection<UserOtp> UserOtps { get; set; }
     }
 }

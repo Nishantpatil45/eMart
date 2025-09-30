@@ -148,5 +148,47 @@ namespace eMart.Service.Api.Controllers
                 });
             }
         }
+
+        [HttpPost("verify-otp")]
+        public IActionResult VerifyOtp([FromBody] VerifyOtpDto dto)
+        {
+            try
+            {
+                var result = _authRepository.VerifyOtp(dto.UserId, dto.OtpCode);
+                if (result.Error == "InvalidOtp")
+                {
+                    return BadRequest(new CommonErrorResponse
+                    {
+                        Path = "/error",
+                        Message = "Invalid OTP.",
+                        Status = CommonStatusCode.BadRequest
+                    });
+                }
+                else if (result.Error == "Not Found")
+                {
+                    return NotFound(new CommonErrorResponse
+                    {
+                        Path = "/error",
+                        Message = CommonMessages.UserNotFound,
+                        Status = CommonStatusCode.NotFound
+                    });
+                }
+                return Ok(new CommonResponse<UserAuthResponseDto>
+                {
+                    Code = CommonStatusCode.Success,
+                    Message = "Access Token",
+                    Data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new CommonErrorResponse
+                {
+                    Path = "/error",
+                    Status = CommonStatusCode.BadRequest,
+                    Message = ex.Message
+                });
+            }
+        }
     }
 }
