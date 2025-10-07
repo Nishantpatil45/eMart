@@ -143,7 +143,9 @@ builder.Services.AddScoped<IEnhancedAuthenticationService, EnhancedAuthenticatio
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Enable Swagger based on configuration or environment
+var enableSwagger = builder.Configuration.GetValue<bool>("EnableSwagger") || app.Environment.IsDevelopment();
+if (enableSwagger)
 {
     app.UseSwagger();
     app.UseSwaggerUI();

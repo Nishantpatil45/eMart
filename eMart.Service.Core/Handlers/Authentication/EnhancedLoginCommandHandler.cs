@@ -5,6 +5,8 @@ using eMart.Service.Core.Interfaces;
 using eMart.Service.Core.Services;
 using MediatR;
 using System.Security;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace eMart.Service.Core.Handlers.Authentication
 {
@@ -43,7 +45,8 @@ namespace eMart.Service.Core.Handlers.Authentication
                     };
                 }
 
-                var user = await _userRepository.GetUserDetails(request.LoginRequest.Email);
+                // Fetch user without requiring existing tokens so first-time login works
+                var user = await _userRepository.GetUserForAuthentication(request.LoginRequest.Email);
                 if (user == null)
                 {
                     return new CommonResponse<EnhancedAuthResponseDto>
@@ -94,6 +97,34 @@ namespace eMart.Service.Core.Handlers.Authentication
                 // Generate tokens
                 var tokenPair = _jwtService.GenerateTokenPair(user, twoFactorEnabled && !string.IsNullOrEmpty(request.TwoFactorCode));
 
+                // Create UserTokens record for compatibility with existing auth flows
+                var refreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+                var refreshTokenHash = ComputeSha256Hash(tokenPair.RefreshToken);
+                
+                var userToken = new eMart.Service.DataModels.UserToken
+                {
+                    UserId = user.Id ?? string.Empty,
+                    AccessToken = tokenPair.AccessToken,
+                    RefreshToken = refreshTokenHash,
+                    RefreshTokenExpiry = refreshTokenExpiry,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    IsRevoked = false
+                };
+
+                // Remove any existing tokens for this user and add the new one
+                var existingTokens = _authenticationRepository.GetUserTokens(user.Id ?? string.Empty);
+                if (existingTokens.Any())
+                {
+                    foreach (var existingToken in existingTokens)
+                    {
+                        existingToken.IsRevoked = true;
+                        existingToken.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                
+                _authenticationRepository.AddUserToken(userToken);
+
                 var response = new EnhancedAuthResponseDto
                 {
                     UserId = user.Id ?? string.Empty,
@@ -103,7 +134,7 @@ namespace eMart.Service.Core.Handlers.Authentication
                     AccessToken = tokenPair.AccessToken,
                     RefreshToken = tokenPair.RefreshToken,
                     AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(15), // Should match JWT config
-                    RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7), // Should match JWT config
+                    RefreshTokenExpiresAt = refreshTokenExpiry,
                     RequiresTwoFactor = false,
                     TwoFactorEnabled = twoFactorEnabled
                 };
@@ -124,6 +155,18 @@ namespace eMart.Service.Core.Handlers.Authentication
                     Data = null
                 };
             }
+        }
+
+        private static string ComputeSha256Hash(string rawData)
+        {
+            using var sha256 = SHA256.Create();
+            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+            var sb = new StringBuilder();
+            foreach (var b in bytes)
+            {
+                sb.Append(b.ToString("x2"));
+            }
+            return sb.ToString();
         }
     }
 }

@@ -317,5 +317,17 @@ namespace eMart.Service.Core.Repositories
             }
         }
 
+        // Methods for Enhanced Authentication compatibility
+        public List<UserToken> GetUserTokens(string userId)
+        {
+            return dbContext.UserTokens.Where(ut => ut.UserId == userId).ToList();
+        }
+
+        public void AddUserToken(UserToken userToken)
+        {
+            dbContext.UserTokens.Add(userToken);
+            dbContext.SaveChanges();
+        }
+
     }
 }

@@ -40,11 +40,10 @@ namespace eMart.Service.Core.Authorization.Handlers
                 return;
             }
 
-            // Check if user has 2FA enabled and verified
-            var twoFactorEnabled = context.User.FindFirst("2fa_enabled")?.Value == "true";
+            // Consider a token with verified 2FA as sufficient for policies that require 2FA
             var twoFactorVerified = context.User.FindFirst("2fa_verified")?.Value == "true";
 
-            if (twoFactorEnabled && twoFactorVerified)
+            if (twoFactorVerified)
             {
                 context.Succeed(requirement);
             }

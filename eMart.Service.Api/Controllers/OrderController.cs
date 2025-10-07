@@ -304,7 +304,7 @@ namespace eMart.Service.Api.Controllers
         /// Get orders for a seller (admin only)
         /// </summary>
         [HttpGet("seller/{sellerId}")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<CommonResponse<List<OrderSummaryDto>>>> GetSellerOrders(
             string sellerId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -335,7 +335,7 @@ namespace eMart.Service.Api.Controllers
         /// Get all orders (admin only)
         /// </summary>
         [HttpGet("GetAllOrders")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<CommonResponse<List<OrderSummaryDto>>>> GetAllOrders(
             [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -366,7 +366,7 @@ namespace eMart.Service.Api.Controllers
         /// Update order status (admin only)
         /// </summary>
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<CommonResponse<object>>> UpdateOrderStatus(
             string id, [FromBody] OrderStatusUpdateDto request)
         {
@@ -405,7 +405,7 @@ namespace eMart.Service.Api.Controllers
         /// Update payment status (admin only)
         /// </summary>
         [HttpPut("{id}/payment-status")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<CommonResponse<object>>> UpdatePaymentStatus(
             string id, [FromBody] OrderPaymentUpdateDto request)
         {
@@ -550,7 +550,7 @@ namespace eMart.Service.Api.Controllers
         /// Get order statistics (admin only)
         /// </summary>
         [HttpGet("statistics")]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<CommonResponse<object>>> GetOrderStatistics(
             [FromQuery] string? sellerId = null,
             [FromQuery] DateTime? startDate = null,

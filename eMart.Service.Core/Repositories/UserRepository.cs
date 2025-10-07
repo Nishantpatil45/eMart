@@ -127,5 +127,24 @@ namespace eMart.Service.Core.Repositories
                 UpdatedBy = user.UpdatedBy
             };
         }
+
+        public async Task<UserDto> GetUserForAuthentication(string emailId)
+        {
+            var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Email == emailId && (x.IsDeleted == null || x.IsDeleted == false));
+            if (user == null)
+            {
+                return null;
+            }
+
+            return new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                Role = user.Role,
+                CreatedBy = user.CreatedBy,
+                UpdatedBy = user.UpdatedBy
+            };
+        }
     }
 }

@@ -11,5 +11,8 @@ namespace eMart.Service.Core.Interfaces
         Task<UserDto> GetUserDetails(string emailId);
 
         Task<UserDto> GetUserDetailsById(string userId);
+
+        // For authentication flows: returns user without requiring existing tokens
+        Task<UserDto> GetUserForAuthentication(string emailId);
     }
 }

@@ -12,6 +12,7 @@ param(
     [string]$JwtAudience = "https://localhost:$Port",
     [int]$JwtAccessTokenExpiryMinutes = 15,
     [int]$JwtRefreshTokenExpiryDays = 7,
+    [bool]$EnableSwagger = $true,
     [switch]$OverwriteAppSettings
 )
 
@@ -58,6 +59,7 @@ if ((-not (Test-Path $appSettingsProd)) -or $OverwriteAppSettings.IsPresent) {
             AccessTokenExpiryMinutes = $JwtAccessTokenExpiryMinutes
             RefreshTokenExpiryDays = $JwtRefreshTokenExpiryDays
         }
+        EnableSwagger = $EnableSwagger
     } | ConvertTo-Json -Depth 5
     $json | Out-File -FilePath $appSettingsProd -Encoding utf8 -Force
 } else {
@@ -70,22 +72,55 @@ if (!(Test-Path $logsFolder)) { New-Item -ItemType Directory -Force -Path $logsF
 
 # Install IIS management module
 Import-Module WebAdministration -ErrorAction SilentlyContinue
-if (-not (Get-Module WebAdministration)) {
-    throw "WebAdministration module not available. Ensure IIS is installed."
+$useAlternativeIIS = $false
+
+# Test if IIS provider is actually working
+try {
+    $testPath = Test-Path IIS:\AppPools -ErrorAction Stop
+    Write-Info "IIS PowerShell provider is available"
+} catch {
+    Write-Warn "IIS PowerShell provider not available. Using appcmd.exe instead..."
+    $useAlternativeIIS = $true
 }
 
 # Create or reuse App Pool
-if (Test-Path IIS:\AppPools\$AppPoolName) {
-    Write-Info "App Pool '$AppPoolName' exists. Updating settings..."
+if ($useAlternativeIIS) {
+    Write-Info "Using appcmd.exe for IIS management..."
+    
+    # Find appcmd.exe path
+    $appcmdPath = "${env:SystemRoot}\System32\inetsrv\appcmd.exe"
+    if (-not (Test-Path $appcmdPath)) {
+        $appcmdPath = "${env:SystemRoot}\SysWOW64\inetsrv\appcmd.exe"
+    }
+    
+    if (-not (Test-Path $appcmdPath)) {
+        throw "appcmd.exe not found. Please ensure IIS is properly installed."
+    }
+    
+    # Check if app pool exists
+    $appPoolExists = & $appcmdPath list apppool $AppPoolName 2>$null
+    if ($appPoolExists) {
+        Write-Info "App Pool '$AppPoolName' exists. Updating settings..."
+    } else {
+        Write-Info "Creating App Pool '$AppPoolName'..."
+        & $appcmdPath add apppool /name:$AppPoolName /managedRuntimeVersion: /managedPipelineMode:Integrated /startMode:AlwaysRunning
+    }
+    
+    # Configure app pool
+    & $appcmdPath set apppool $AppPoolName /processModel.idleTimeout:00:00:00
 } else {
-    Write-Info "Creating App Pool '$AppPoolName'..."
-    New-WebAppPool -Name $AppPoolName | Out-Null
-}
+    if (Test-Path IIS:\AppPools\$AppPoolName) {
+        Write-Info "App Pool '$AppPoolName' exists. Updating settings..."
+    } else {
+        Write-Info "Creating App Pool '$AppPoolName'..."
+        New-WebAppPool -Name $AppPoolName | Out-Null
+    }
 
-Set-ItemProperty IIS:\AppPools\$AppPoolName -Name managedRuntimeVersion -Value ''
-Set-ItemProperty IIS:\AppPools\$AppPoolName -Name managedPipelineMode -Value 'Integrated'
-Set-ItemProperty IIS:\AppPools\$AppPoolName -Name startMode -Value 'AlwaysRunning'
-Set-ItemProperty IIS:\AppPools\$AppPoolName -Name processModel.idleTimeout -Value ([TimeSpan]::FromMinutes(0))
+    Set-ItemProperty IIS:\AppPools\$AppPoolName -Name managedRuntimeVersion -Value ''
+    Set-ItemProperty IIS:\AppPools\$AppPoolName -Name managedPipelineMode -Value 'Integrated'
+    Set-ItemProperty IIS:\AppPools\$AppPoolName -Name startMode -Value 'AlwaysRunning'
+    Set-ItemProperty IIS:\AppPools\$AppPoolName -Name processModel.idleTimeout -Value ([TimeSpan]::FromMinutes(0))
+}
 
 # Grant folder permissions to App Pool identity
 $appPoolIdentity = "IIS AppPool\$AppPoolName"
@@ -95,28 +130,58 @@ $grantArg = '"{0}":(OI)(CI)M' -f $appPoolIdentity
 icacls "$publishFullPath" /grant $grantArg /T | Out-Null
 
 # Create or update Website
-if (Test-Path IIS:\Sites\$SiteName) {
-    Write-Info "Site '$SiteName' exists. Updating physical path and binding..."
-    Set-ItemProperty IIS:\Sites\$SiteName -Name physicalPath -Value $publishFullPath
+if ($useAlternativeIIS) {
+    # Check if site exists
+    $siteExists = & $appcmdPath list site $SiteName 2>$null
+    if ($siteExists) {
+        Write-Info "Site '$SiteName' exists. Updating physical path and binding..."
+        & $appcmdPath set site $SiteName /physicalPath:$publishFullPath
+    } else {
+        Write-Info "Creating Website '$SiteName'..."
+        $bindingString = "http/*:${Port}:"
+        & $appcmdPath add site /name:$SiteName /physicalPath:$publishFullPath /bindings:$bindingString
+    }
+    
+    # Set application pool
+    & $appcmdPath set app $SiteName /applicationPool:$AppPoolName
+    
+    # Ensure binding exists
+    $portPattern = ":${Port}:"
+    $bindingExists = & $appcmdPath list binding /site.name:$SiteName | Select-String $portPattern
+    if (-not $bindingExists) {
+        Write-Info "Adding HTTP binding on port $Port"
+        $bindingInfo = "*:${Port}:"
+        & $appcmdPath set site $SiteName /+bindings.[protocol='http',bindingInformation='$bindingInfo']
+    }
 } else {
-    Write-Info "Creating Website '$SiteName'..."
-    New-Website -Name $SiteName -PhysicalPath $publishFullPath -Port $Port -Force | Out-Null
-}
+    if (Test-Path IIS:\Sites\$SiteName) {
+        Write-Info "Site '$SiteName' exists. Updating physical path and binding..."
+        Set-ItemProperty IIS:\Sites\$SiteName -Name physicalPath -Value $publishFullPath
+    } else {
+        Write-Info "Creating Website '$SiteName'..."
+        New-Website -Name $SiteName -PhysicalPath $publishFullPath -Port $Port -Force | Out-Null
+    }
 
-Set-ItemProperty IIS:\Sites\$SiteName -Name applicationPool -Value $AppPoolName
+    Set-ItemProperty IIS:\Sites\$SiteName -Name applicationPool -Value $AppPoolName
 
-# Ensure binding
-$bindingPattern = ('*:' + $Port + ':*')
-$existingBinding = (Get-WebBinding -Name $SiteName -Protocol 'http' -ErrorAction SilentlyContinue | Where-Object { $_.bindingInformation -like $bindingPattern })
-if (-not $existingBinding) {
-    Write-Info "Adding HTTP binding on port $Port"
-    New-WebBinding -Name $SiteName -Protocol http -Port $Port -IPAddress '*'
+    # Ensure binding
+    $bindingPattern = ('*:' + $Port + ':*')
+    $existingBinding = (Get-WebBinding -Name $SiteName -Protocol 'http' -ErrorAction SilentlyContinue | Where-Object { $_.bindingInformation -like $bindingPattern })
+    if (-not $existingBinding) {
+        Write-Info "Adding HTTP binding on port $Port"
+        New-WebBinding -Name $SiteName -Protocol http -Port $Port -IPAddress '*'
+    }
 }
 
 # Set ASPNETCORE_ENVIRONMENT
 Write-Info "Setting ASPNETCORE_ENVIRONMENT=$Environment"
-Set-WebConfigurationProperty -Filter "/system.webServer/aspNetCore/environmentVariables" -PSPath "IIS:\Sites\$SiteName" -Name "." -Value @{ name = 'ASPNETCORE_ENVIRONMENT'; value = $Environment } -ErrorAction SilentlyContinue | Out-Null
-Add-WebConfigurationProperty -Filter "/system.webServer/aspNetCore/environmentVariables" -PSPath "IIS:\Sites\$SiteName" -Name "." -Value @{ name = 'ASPNETCORE_ENVIRONMENT'; value = $Environment } -ErrorAction SilentlyContinue | Out-Null
+if ($useAlternativeIIS) {
+    # Use appcmd to set environment variable
+    & $appcmdPath set config $SiteName /section:system.webServer/aspNetCore /environmentVariables.[name='ASPNETCORE_ENVIRONMENT',value='$Environment'] /commit:apphost
+} else {
+    Set-WebConfigurationProperty -Filter "/system.webServer/aspNetCore/environmentVariables" -PSPath "IIS:\Sites\$SiteName" -Name "." -Value @{ name = 'ASPNETCORE_ENVIRONMENT'; value = $Environment } -ErrorAction SilentlyContinue | Out-Null
+    Add-WebConfigurationProperty -Filter "/system.webServer/aspNetCore/environmentVariables" -PSPath "IIS:\Sites\$SiteName" -Name "." -Value @{ name = 'ASPNETCORE_ENVIRONMENT'; value = $Environment } -ErrorAction SilentlyContinue | Out-Null
+}
 
 # Optionally enable stdout logging for first run
 $webConfigPath = Join-Path $publishFullPath 'web.config'
@@ -134,8 +199,13 @@ if (Test-Path $webConfigPath) {
 
 # Restart site
 Write-Info "Restarting site '$SiteName'"
-Stop-Website -Name $SiteName -ErrorAction SilentlyContinue | Out-Null
-Start-Website -Name $SiteName | Out-Null
+if ($useAlternativeIIS) {
+    & $appcmdPath stop site $SiteName
+    & $appcmdPath start site $SiteName
+} else {
+    Stop-Website -Name $SiteName -ErrorAction SilentlyContinue | Out-Null
+    Start-Website -Name $SiteName | Out-Null
+}
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green

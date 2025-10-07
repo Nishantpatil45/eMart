@@ -1,4 +1,5 @@
 ﻿using eMart.Service.Core.Dtos.Authentication;
+using eMart.Service.DataModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,5 +14,9 @@ namespace eMart.Service.Core.Interfaces
         public UserAuthResponseDto Logout(string refreshToken);
         public TokenDto RefreshToken(string token);
         UserAuthResponseDto VerifyOtp(string userId, string otpCode);
+        
+        // Methods for Enhanced Authentication compatibility
+        List<UserToken> GetUserTokens(string userId);
+        void AddUserToken(UserToken userToken);
     }
 }

@@ -20,6 +20,7 @@ namespace eMart.Service.Api.Controllers
         }
 
         [HttpPost("AddProduct")]
+        [Authorize(Roles = "Admin,Seller")]
         public async Task<ActionResult> AddProduct([FromBody] ProductCreateRequestDto productCreateRequestDto)
         {
             try
@@ -207,6 +208,7 @@ namespace eMart.Service.Api.Controllers
         }
 
         [HttpPut("Product/{id}")]
+        [Authorize(Roles = "Admin,Seller")]
         public async Task<ActionResult> UpdateProduct(string id, ProductCreateRequestDto productCreateRequestDto)
         {
             try
@@ -259,6 +261,7 @@ namespace eMart.Service.Api.Controllers
         }
 
         [HttpDelete("Product/{id}")]
+        [Authorize(Roles = "Admin,Seller")]
         public async Task<ActionResult> DeleteProduct(string id)
         {
             try
